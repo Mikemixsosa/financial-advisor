@@ -57,3 +57,44 @@ export const fetchCategories = async (userId: string) => {
     }
   };
   
+
+  export const updateCategory = async (category: { id: string; nombre: string; tipo: string }) => {
+    try {
+      const response = await fetch(`/api/categories/${category.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: category.nombre,
+          tipo: category.tipo,
+        }),
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al actualizar categoría');
+      }
+  
+      return await response.json();
+    } catch (error) {
+      console.error('Error al actualizar categoría:', error);
+      throw new Error('Error al actualizar categoría');
+    }
+  };
+  
+  export const deleteCategory = async (categoryId: string) => {
+    try {
+      const response = await fetch(`/api/categories/${categoryId}`, {
+        method: 'DELETE',
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al eliminar categoría');
+      }
+  
+      return await response.json();
+    } catch (error) {
+      console.error('Error al eliminar categoría:', error);
+      throw new Error('Error al eliminar categoría');
+    }
+  };

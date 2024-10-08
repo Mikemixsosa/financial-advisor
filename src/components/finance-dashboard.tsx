@@ -10,30 +10,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { BarChart, CalendarIcon, ChevronDown, ChevronUp, DollarSign, Filter, PiggyBank, X, AlertCircle } from 'lucide-react'
+import { BarChart, CalendarIcon, ChevronDown, ChevronUp, DollarSign, Filter, PiggyBank, X, AlertCircle, Edit, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { fetchCategories, fetchTransactions, addTransaction, addCategory } from './financedashboardcomponents/apiServices'
+import { fetchCategories, fetchTransactions, addTransaction, addCategory, updateCategory, deleteCategory } from './financedashboardcomponents/apiServices'
+import { Transaction, Category, DateRange } from './financedashboardcomponents/financedashboardtypes'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
-type Transaction = {
-  id: number
-  descripcion: string
-  monto: number
-  fecha: string
-  tipo: 'Ingreso' | 'Gasto'
-  categoria: string
-}
-
-type Category = {
-  id: number
-  nombre: string
-  tipo: 'Ingreso' | 'Gasto'
-}
-
-type DateRange = {
-  from: Date | undefined
-  to: Date | undefined
-}
 
 export function FinanceDashboardComponent() {
   const [userId, setUserId] = useState<string | null>(null)
@@ -58,6 +49,11 @@ export function FinanceDashboardComponent() {
   const [showFilters, setShowFilters] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null)
+
   const router = useRouter()
 
   // Fetch userId and initialize data
@@ -86,7 +82,7 @@ export function FinanceDashboardComponent() {
   }
 
 
-  
+
 
   // Handle adding a new transaction
   const handleAddTransaction = async (e: React.FormEvent) => {
@@ -109,13 +105,39 @@ export function FinanceDashboardComponent() {
 
     try {
       const addedCategory = await addCategory(newCategory, userId)
+      setCategories(prevCategories => [...prevCategories, addedCategory])
       setNewCategory({ nombre: '', tipo: 'Gasto' })
-      await initializeData(userId) // Recargar categorías después de agregar una
     } catch (error) {
       setError(error.message)
     }
   }
-  
+
+  const handleEditCategory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingCategory) return
+
+    try {
+      const updatedCategory = await updateCategory(editingCategory)
+      setCategories(categories.map(cat => cat.id === updatedCategory.id ? updatedCategory : cat))
+      setEditingCategory(null)
+      setIsEditDialogOpen(false)  // Cerrar el diálogo si la edición fue exitosa
+    } catch (error) {
+      console.error('Error al actualizar la categoría:', error)
+    }
+  }
+
+  const handleDeleteCategory = async () => {
+    if (!userId || !deletingCategoryId) return
+
+    try {
+      await deleteCategory(deletingCategoryId)
+      setCategories(categories.filter(cat => cat.id !== deletingCategoryId))
+      setIsDeleteDialogOpen(false)
+      setDeletingCategoryId(null)
+    } catch (error) {
+      setError(error.message)
+    }
+  }
 
 
   const clearFilters = () => {
@@ -139,7 +161,7 @@ export function FinanceDashboardComponent() {
   const totalExpenses = filteredTransactions.filter(t => t.tipo === 'Gasto').reduce((sum, t) => sum + t.monto, 0)
   const balance = totalIncome - totalExpenses
 
-  if (isLoading) return <div>Loading...</div> 
+  if (isLoading) return <div>Loading...</div>
 
   return (
     <div className="container mx-auto p-4">
@@ -404,9 +426,85 @@ export function FinanceDashboardComponent() {
                 {categories.map((category) => (
                   <div key={category.id} className="flex justify-between items-center border-b py-2">
                     <p className="font-semibold">{category.nombre}</p>
-                    <p className={`text-sm ${category.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                      {category.tipo}
-                    </p>
+                    <div className="flex items-center space-x-2">
+                      <p className={`text-sm ${category.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
+                        {category.tipo}
+                      </p>
+                      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditingCategory(category)
+                              setIsEditDialogOpen(true)
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Editar Categoría</DialogTitle>
+                          </DialogHeader>
+                          <form onSubmit={handleEditCategory} className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="editCategoryName">Nombre</Label>
+                              <Input
+                                id="editCategoryName"
+                                value={editingCategory?.nombre || ''}
+                                onChange={(e) => setEditingCategory({ ...editingCategory!, nombre: e.target.value })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="editCategoryType">Tipo</Label>
+                              <Select
+                                onValueChange={(value: 'Ingreso' | 'Gasto') => setEditingCategory({ ...editingCategory!, tipo: value })}
+                                defaultValue={editingCategory?.tipo}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecciona el tipo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Ingreso">Ingreso</SelectItem>
+                                  <SelectItem value="Gasto">Gasto</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <DialogFooter>
+                              <Button type="submit">Guardar Cambios</Button>
+                            </DialogFooter>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setDeletingCategoryId(category.id)
+                              setIsDeleteDialogOpen(true)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Confirmar Eliminación</DialogTitle>
+                            <DialogDescription>
+                              ¿Estás seguro de que quieres eliminar la categoría "{category.nombre}"? Esta acción no se puede deshacer.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancelar</Button>
+                            <Button variant="destructive" onClick={handleDeleteCategory}>Eliminar</Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
                 ))}
               </div>
