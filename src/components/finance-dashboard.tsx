@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { BarChart, CalendarIcon, ChevronDown, ChevronUp, DollarSign, Filter, PiggyBank, X, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { fetchCategories, fetchTransactions, addTransaction, addCategory } from './financedashboardcomponents/apiServices'
 
 type Transaction = {
   id: number
@@ -66,36 +67,26 @@ export function FinanceDashboardComponent() {
       router.push('/login')
     } else {
       setUserId(storedUserId)
-      fetchCategories(storedUserId)
-      fetchTransactions(storedUserId)
+      initializeData(storedUserId)
     }
   }, [router])
 
-  // Fetch categories from the API
-  const fetchCategories = async (userId: string) => {
+  const initializeData = async (userId: string) => {
     try {
-      const response = await fetch(`/api/categories?userId=${userId}`)
-      if (!response.ok) throw new Error('Failed to fetch categories')
-      const data = await response.json()
-      setCategories(data)
+      setIsLoading(true)
+      const categoriesData = await fetchCategories(userId)
+      setCategories(categoriesData)
+      const transactionsData = await fetchTransactions(userId)
+      setTransactions(transactionsData)
     } catch (error) {
-      setError('Error fetching categories')
-    }
-  }
-
-  // Fetch transactions from the API
-  const fetchTransactions = async (userId: string) => {
-    try {
-      const response = await fetch(`/api/transactions?userId=${userId}`)
-      if (!response.ok) throw new Error('Failed to fetch transactions')
-      const data = await response.json()
-      setTransactions(data)
-    } catch (error) {
-      setError('Error fetching transactions')
+      setError('Error al cargar los datos iniciales')
     } finally {
       setIsLoading(false)
     }
   }
+
+
+  
 
   // Handle adding a new transaction
   const handleAddTransaction = async (e: React.FormEvent) => {
@@ -103,51 +94,27 @@ export function FinanceDashboardComponent() {
     if (!userId) return
 
     try {
-      const response = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newTransaction,
-          usuario_id: userId,
-          categoria_id: categories.find(c => c.nombre === newTransaction.categoria)?.id
-        }),
-      })
-
-      if (!response.ok) throw new Error('Failed to add transaction')
-      const addedTransaction = await response.json()
+      const addedTransaction = await addTransaction(newTransaction, userId, categories)
       setTransactions([...transactions, addedTransaction])
       setNewTransaction({ descripcion: '', monto: '', fecha: format(new Date(), 'yyyy-MM-dd'), tipo: 'Gasto', categoria: '' })
     } catch (error) {
-      setError('Error adding transaction')
+      setError(error.message)
     }
   }
 
   // Handle adding a new category
   const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userId) return;
-  
+    e.preventDefault()
+    if (!userId) return
+
     try {
-      const response = await fetch('/api/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: newCategory.nombre,
-          tipo: newCategory.tipo,
-          usuario_id: userId
-        }),
-      });
-  
-      if (!response.ok) throw new Error('Failed to add category');
-      const addedCategory = await response.json();
-      setNewCategory({ nombre: '', tipo: 'Gasto' });
-  
-      // Volver a cargar categorías después de agregar una
-      await fetchCategories(userId);
+      const addedCategory = await addCategory(newCategory, userId)
+      setNewCategory({ nombre: '', tipo: 'Gasto' })
+      await initializeData(userId) // Recargar categorías después de agregar una
     } catch (error) {
-      setError('Error adding category');
+      setError(error.message)
     }
-  };
+  }
   
 
 
@@ -172,7 +139,7 @@ export function FinanceDashboardComponent() {
   const totalExpenses = filteredTransactions.filter(t => t.tipo === 'Gasto').reduce((sum, t) => sum + t.monto, 0)
   const balance = totalIncome - totalExpenses
 
-  if (isLoading) return <div>Loading...</div>
+  if (isLoading) return <div>Loading...</div> 
 
   return (
     <div className="container mx-auto p-4">
