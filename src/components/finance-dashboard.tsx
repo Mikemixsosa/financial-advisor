@@ -14,20 +14,19 @@ import { BarChart, CalendarIcon, ChevronDown, ChevronUp, DollarSign, Filter, Pig
 import { format } from 'date-fns'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-
 type Transaction = {
   id: number
-  description: string
-  amount: number
-  date: string
-  type: 'Ingreso' | 'Gasto'
-  category: string
+  descripcion: string
+  monto: number
+  fecha: string
+  tipo: 'Ingreso' | 'Gasto'
+  categoria: string
 }
 
 type Category = {
   id: number
-  name: string
-  type: 'Ingreso' | 'Gasto'
+  nombre: string
+  tipo: 'Ingreso' | 'Gasto'
 }
 
 type DateRange = {
@@ -40,20 +39,20 @@ export function FinanceDashboardComponent() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [newTransaction, setNewTransaction] = useState({
-    description: '',
-    amount: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    type: 'Gasto' as 'Ingreso' | 'Gasto',
-    category: '',
+    descripcion: '',
+    monto: '',
+    fecha: format(new Date(), 'yyyy-MM-dd'),
+    tipo: 'Gasto' as 'Ingreso' | 'Gasto',
+    categoria: '',
   })
   const [newCategory, setNewCategory] = useState({
-    name: '',
-    type: 'Gasto' as 'Ingreso' | 'Gasto',
+    nombre: '',
+    tipo: 'Gasto' as 'Ingreso' | 'Gasto',
   })
   const [filters, setFilters] = useState({
     dateRange: { from: undefined, to: undefined } as DateRange,
-    type: 'Todos' as 'Todos' | 'Ingreso' | 'Gasto',
-    category: 'Todas',
+    tipo: 'Todos' as 'Todos' | 'Ingreso' | 'Gasto',
+    categoria: 'Todas',
   })
   const [showFilters, setShowFilters] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
@@ -110,14 +109,14 @@ export function FinanceDashboardComponent() {
         body: JSON.stringify({
           ...newTransaction,
           usuario_id: userId,
-          categoria_id: categories.find(c => c.name === newTransaction.category)?.id
+          categoria_id: categories.find(c => c.nombre === newTransaction.categoria)?.id
         }),
       })
 
       if (!response.ok) throw new Error('Failed to add transaction')
       const addedTransaction = await response.json()
       setTransactions([...transactions, addedTransaction])
-      setNewTransaction({ description: '', amount: '', date: format(new Date(), 'yyyy-MM-dd'), type: 'Gasto', category: '' })
+      setNewTransaction({ descripcion: '', monto: '', fecha: format(new Date(), 'yyyy-MM-dd'), tipo: 'Gasto', categoria: '' })
     } catch (error) {
       setError('Error adding transaction')
     }
@@ -125,47 +124,52 @@ export function FinanceDashboardComponent() {
 
   // Handle adding a new category
   const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!userId) return
-
+    e.preventDefault();
+    if (!userId) return;
+  
     try {
       const response = await fetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...newCategory,
+          nombre: newCategory.nombre,
+          tipo: newCategory.tipo,
           usuario_id: userId
         }),
-      })
-
-      if (!response.ok) throw new Error('Failed to add category')
-      const addedCategory = await response.json()
-      setCategories([...categories, addedCategory])
-      setNewCategory({ name: '', type: 'Gasto' })
+      });
+  
+      if (!response.ok) throw new Error('Failed to add category');
+      const addedCategory = await response.json();
+      setNewCategory({ nombre: '', tipo: 'Gasto' });
+  
+      // Volver a cargar categorías después de agregar una
+      await fetchCategories(userId);
     } catch (error) {
-      setError('Error adding category')
+      setError('Error adding category');
     }
-  }
+  };
+  
+
 
   const clearFilters = () => {
     setFilters({
       dateRange: { from: undefined, to: undefined },
-      type: 'Todos',
-      category: 'Todas',
+      tipo: 'Todos',
+      categoria: 'Todas',
     })
   }
 
   const filteredTransactions = transactions.filter(transaction => {
     const dateInRange = filters.dateRange.from && filters.dateRange.to
-      ? new Date(transaction.date) >= filters.dateRange.from && new Date(transaction.date) <= filters.dateRange.to
+      ? new Date(transaction.fecha) >= filters.dateRange.from && new Date(transaction.fecha) <= filters.dateRange.to
       : true
-    const typeMatch = filters.type === 'Todos' || transaction.type === filters.type
-    const categoryMatch = filters.category === 'Todas' || transaction.category === filters.category
+    const typeMatch = filters.tipo === 'Todos' || transaction.tipo === filters.tipo
+    const categoryMatch = filters.categoria === 'Todas' || transaction.categoria === filters.categoria
     return dateInRange && typeMatch && categoryMatch
   })
 
-  const totalIncome = filteredTransactions.filter(t => t.type === 'Ingreso').reduce((sum, t) => sum + t.amount, 0)
-  const totalExpenses = filteredTransactions.filter(t => t.type === 'Gasto').reduce((sum, t) => sum + t.amount, 0)
+  const totalIncome = filteredTransactions.filter(t => t.tipo === 'Ingreso').reduce((sum, t) => sum + t.monto, 0)
+  const totalExpenses = filteredTransactions.filter(t => t.tipo === 'Gasto').reduce((sum, t) => sum + t.monto, 0)
   const balance = totalIncome - totalExpenses
 
   if (isLoading) return <div>Loading...</div>
@@ -181,7 +185,7 @@ export function FinanceDashboardComponent() {
         </Alert>
       )}
 
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -260,7 +264,7 @@ export function FinanceDashboardComponent() {
               </div>
               <div className="flex-1 min-w-[200px]">
                 <Label htmlFor="type">Tipo de Transacción</Label>
-                <Select onValueChange={(value: 'Todos' | 'Ingreso' | 'Gasto') => setFilters({ ...filters, type: value })}>
+                <Select onValueChange={(value: 'Todos' | 'Ingreso' | 'Gasto') => setFilters({ ...filters, tipo: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar tipo" />
                   </SelectTrigger>
@@ -273,14 +277,14 @@ export function FinanceDashboardComponent() {
               </div>
               <div className="flex-1 min-w-[200px]">
                 <Label htmlFor="category">Categoría</Label>
-                <Select onValueChange={(value) => setFilters({ ...filters, category: value })}>
+                <Select onValueChange={(value) => setFilters({ ...filters, categoria: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar categoría" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Todas">Todas</SelectItem>
                     {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
+                      <SelectItem key={category.id} value={category.nombre}>{category.nombre}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -311,8 +315,8 @@ export function FinanceDashboardComponent() {
                     <Label htmlFor="description">Descripción</Label>
                     <Input
                       id="description"
-                      value={newTransaction.description}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+                      value={newTransaction.descripcion}
+                      onChange={(e) => setNewTransaction({ ...newTransaction, descripcion: e.target.value })}
                       required
                     />
                   </div>
@@ -321,8 +325,8 @@ export function FinanceDashboardComponent() {
                     <Input
                       id="amount"
                       type="number"
-                      value={newTransaction.amount}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                      value={newTransaction.monto}
+                      onChange={(e) => setNewTransaction({ ...newTransaction, monto: e.target.value })}
                       required
                     />
                   </div>
@@ -331,14 +335,14 @@ export function FinanceDashboardComponent() {
                     <Input
                       id="date"
                       type="date"
-                      value={newTransaction.date}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                      value={newTransaction.fecha}
+                      onChange={(e) => setNewTransaction({ ...newTransaction, fecha: e.target.value })}
                       required
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="type">Tipo</Label>
-                    <Select onValueChange={(value: 'Ingreso' | 'Gasto') => setNewTransaction({ ...newTransaction, type: value })}>
+                    <Select onValueChange={(value: 'Ingreso' | 'Gasto') => setNewTransaction({ ...newTransaction, tipo: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona el tipo" />
                       </SelectTrigger>
@@ -350,13 +354,13 @@ export function FinanceDashboardComponent() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="category">Categoría</Label>
-                    <Select onValueChange={(value) => setNewTransaction({ ...newTransaction, category: value })}>
+                    <Select onValueChange={(value) => setNewTransaction({ ...newTransaction, categoria: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona la categoría" />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
+                          <SelectItem key={category.id} value={category.nombre}>{category.nombre}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -376,11 +380,11 @@ export function FinanceDashboardComponent() {
                 {filteredTransactions.map((transaction) => (
                   <div key={transaction.id} className="flex justify-between items-center border-b py-2">
                     <div>
-                      <p className="font-semibold">{transaction.description}</p>
-                      <p className="text-sm  text-gray-500">{transaction.date} - {transaction.category}</p>
+                      <p className="font-semibold">{transaction.descripcion}</p>
+                      <p className="text-sm  text-gray-500">{transaction.fecha} - {transaction.categoria}</p>
                     </div>
-                    <p className={`font-bold ${transaction.type === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                      {transaction.type === 'Ingreso' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                    <p className={`font-bold ${transaction.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
+                      {transaction.tipo === 'Ingreso' ? '+' : '-'}${transaction.monto.toFixed(2)}
                     </p>
                   </div>
                 ))}
@@ -401,14 +405,14 @@ export function FinanceDashboardComponent() {
                     <Label htmlFor="categoryName">Nombre</Label>
                     <Input
                       id="categoryName"
-                      value={newCategory.name}
-                      onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                      value={newCategory.nombre}
+                      onChange={(e) => setNewCategory({ ...newCategory, nombre: e.target.value })}
                       required
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="categoryType">Tipo</Label>
-                    <Select onValueChange={(value: 'Ingreso' | 'Gasto') => setNewCategory({ ...newCategory, type: value })}>
+                    <Select onValueChange={(value: 'Ingreso' | 'Gasto') => setNewCategory({ ...newCategory, tipo: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona el tipo" />
                       </SelectTrigger>
@@ -432,9 +436,9 @@ export function FinanceDashboardComponent() {
               <div className="space-y-2">
                 {categories.map((category) => (
                   <div key={category.id} className="flex justify-between items-center border-b py-2">
-                    <p className="font-semibold">{category.name}</p>
-                    <p className={`text-sm ${category.type === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                      {category.type}
+                    <p className="font-semibold">{category.nombre}</p>
+                    <p className={`text-sm ${category.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
+                      {category.tipo}
                     </p>
                   </div>
                 ))}
