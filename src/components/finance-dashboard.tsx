@@ -10,11 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { BarChart, CalendarIcon, ChevronDown, ChevronUp, DollarSign, Filter, PiggyBank, X, AlertCircle, Edit, Trash2 } from 'lucide-react'
+import { CalendarIcon, ChevronDown, ChevronUp, DollarSign, Filter, PiggyBank, X, AlertCircle, Edit, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { fetchCategories, fetchTransactions, addTransaction, addCategory, updateCategory, deleteCategory } from './financedashboardcomponents/apiServices'
+import { fetchCategories, fetchTransactions } from './financedashboardcomponents/apiServices'
+import { addTransaction, updateTransaction, deleteTransaction } from './financedashboardcomponents/transactionsApiServices'
 import { Transaction, Category, DateRange } from './financedashboardcomponents/financedashboardtypes'
+import { CategoryTab } from './CategoryTab'
 import {
   Dialog,
   DialogContent,
@@ -24,7 +26,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-
 
 export function FinanceDashboardComponent() {
   const [userId, setUserId] = useState<string | null>(null)
@@ -37,10 +38,6 @@ export function FinanceDashboardComponent() {
     tipo: 'Gasto' as 'Ingreso' | 'Gasto',
     categoria: '',
   })
-  const [newCategory, setNewCategory] = useState({
-    nombre: '',
-    tipo: 'Gasto' as 'Ingreso' | 'Gasto',
-  })
   const [filters, setFilters] = useState({
     dateRange: { from: undefined, to: undefined } as DateRange,
     tipo: 'Todos' as 'Todos' | 'Ingreso' | 'Gasto',
@@ -49,42 +46,47 @@ export function FinanceDashboardComponent() {
   const [showFilters, setShowFilters] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null)
-
+  const [deletingTransactionId, setDeletingTransactionId] = useState<string | null>(null)
+  const [filteredCategories, setFilteredCategories] = useState<Category[]>([])
   const router = useRouter()
 
-  // Fetch userId and initialize data
   useEffect(() => {
     const storedUserId = localStorage.getItem('userId')
     if (!storedUserId) {
-      router.push('/login')
+      router.push('/auth/login')
     } else {
       setUserId(storedUserId)
       initializeData(storedUserId)
     }
   }, [router])
 
+
+
   const initializeData = async (userId: string) => {
     try {
       setIsLoading(true)
+
       const categoriesData = await fetchCategories(userId)
       setCategories(categoriesData)
+      setFilteredCategories(categoriesData.filter(category => category.tipo === newTransaction.tipo)) // Filtrar categorías iniciales según el tipo por defecto
       const transactionsData = await fetchTransactions(userId)
       setTransactions(transactionsData)
     } catch (error) {
-      setError('Error al cargar los datos iniciales')
+      console.error('Error al cargar los datos iniciales', error)
     } finally {
       setIsLoading(false)
+
     }
   }
 
+  const handleTransactionTypeChange = (tipo: 'Ingreso' | 'Gasto') => {
+    setNewTransaction({ ...newTransaction, tipo, categoria: '' }) // Cambiar el tipo y resetear la categoría seleccionada
+    setFilteredCategories(categories.filter(category => category.tipo === tipo)) // Filtrar las categorías según el tipo seleccionado
+  }
 
-
-
-  // Handle adding a new transaction
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!userId) return
@@ -93,52 +95,41 @@ export function FinanceDashboardComponent() {
       const addedTransaction = await addTransaction(newTransaction, userId, categories)
       setTransactions([...transactions, addedTransaction])
       setNewTransaction({ descripcion: '', monto: '', fecha: format(new Date(), 'yyyy-MM-dd'), tipo: 'Gasto', categoria: '' })
-    } catch (error) {
+      setFilteredCategories(categories.filter(category => category.tipo === 'Gasto')) // Actualizar las categorías según el tipo por defecto
+    } catch (error: any) {
       setError(error.message)
     }
   }
 
-  // Handle adding a new category
-  const handleAddCategory = async (e: React.FormEvent) => {
+
+  const handleEditTransaction = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!userId) return
+    if (!editingTransaction) return
 
     try {
-      const addedCategory = await addCategory(newCategory, userId)
-      setCategories(prevCategories => [...prevCategories, addedCategory])
-      setNewCategory({ nombre: '', tipo: 'Gasto' })
+      const updatedTransaction = await updateTransaction(editingTransaction)
+      setTransactions(transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t))
+      setEditingTransaction(null)
+      setIsEditDialogOpen(false)
     } catch (error) {
-      setError(error.message)
+      console.error('Error al actualizar la transacción:', error)
+      setError('Error al actualizar la transacción')
     }
   }
 
-  const handleEditCategory = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingCategory) return
+  const handleDeleteTransaction = async () => {
+    if (!deletingTransactionId) return
 
     try {
-      const updatedCategory = await updateCategory(editingCategory)
-      setCategories(categories.map(cat => cat.id === updatedCategory.id ? updatedCategory : cat))
-      setEditingCategory(null)
-      setIsEditDialogOpen(false)  // Cerrar el diálogo si la edición fue exitosa
-    } catch (error) {
-      console.error('Error al actualizar la categoría:', error)
-    }
-  }
-
-  const handleDeleteCategory = async () => {
-    if (!userId || !deletingCategoryId) return
-
-    try {
-      await deleteCategory(deletingCategoryId)
-      setCategories(categories.filter(cat => cat.id !== deletingCategoryId))
+      await deleteTransaction(deletingTransactionId)
+      setTransactions(transactions.filter(t => t.id !== deletingTransactionId))
       setIsDeleteDialogOpen(false)
-      setDeletingCategoryId(null)
+      setDeletingTransactionId(null)
     } catch (error) {
-      setError(error.message)
+      console.error('Error al eliminar la transacción:', error)
+      setError('Error al eliminar la transacción')
     }
   }
-
 
   const clearFilters = () => {
     setFilters({
@@ -147,6 +138,8 @@ export function FinanceDashboardComponent() {
       categoria: 'Todas',
     })
   }
+
+
 
   const filteredTransactions = transactions.filter(transaction => {
     const dateInRange = filters.dateRange.from && filters.dateRange.to
@@ -173,7 +166,6 @@ export function FinanceDashboardComponent() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
@@ -293,13 +285,44 @@ export function FinanceDashboardComponent() {
         </TabsList>
 
         <TabsContent value="transactions" className="space-y-4">
-          <Card>
+          <Card className="mb-6">
             <CardHeader>
               <CardTitle>Agregar Transacción</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleAddTransaction} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Tipo</Label>
+                    <Select
+                      onValueChange={(value: 'Ingreso' | 'Gasto') => handleTransactionTypeChange(value)}
+                      value={newTransaction.tipo}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona el tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Ingreso">Ingreso</SelectItem>
+                        <SelectItem value="Gasto">Gasto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Categoría</Label>
+                    <Select
+                      onValueChange={(value) => setNewTransaction({ ...newTransaction, categoria: value })}
+                      value={newTransaction.categoria}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona la categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.nombre}>{category.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="description">Descripción</Label>
                     <Input
@@ -329,31 +352,6 @@ export function FinanceDashboardComponent() {
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Tipo</Label>
-                    <Select onValueChange={(value: 'Ingreso' | 'Gasto') => setNewTransaction({ ...newTransaction, tipo: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona el tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Ingreso">Ingreso</SelectItem>
-                        <SelectItem value="Gasto">Gasto</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Categoría</Label>
-                    <Select onValueChange={(value) => setNewTransaction({ ...newTransaction, categoria: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona la categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.nombre}>{category.nombre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
                 <Button type="submit">Agregar Transacción</Button>
               </form>
@@ -370,65 +368,11 @@ export function FinanceDashboardComponent() {
                   <div key={transaction.id} className="flex justify-between items-center border-b py-2">
                     <div>
                       <p className="font-semibold">{transaction.descripcion}</p>
-                      <p className="text-sm  text-gray-500">{transaction.fecha} - {transaction.categoria}</p>
+                      <p className="text-sm text-gray-500">{transaction.fecha} - {transaction.categoria}</p>
                     </div>
-                    <p className={`font-bold ${transaction.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                      {transaction.tipo === 'Ingreso' ? '+' : '-'}${transaction.monto.toFixed(2)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="categories" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Agregar Categoría</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleAddCategory} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="categoryName">Nombre</Label>
-                    <Input
-                      id="categoryName"
-                      value={newCategory.nombre}
-                      onChange={(e) => setNewCategory({ ...newCategory, nombre: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="categoryType">Tipo</Label>
-                    <Select onValueChange={(value: 'Ingreso' | 'Gasto') => setNewCategory({ ...newCategory, tipo: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona el tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Ingreso">Ingreso</SelectItem>
-                        <SelectItem value="Gasto">Gasto</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button type="submit">Agregar Categoría</Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Mis Categorías</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {categories.map((category) => (
-                  <div key={category.id} className="flex justify-between items-center border-b py-2">
-                    <p className="font-semibold">{category.nombre}</p>
                     <div className="flex items-center space-x-2">
-                      <p className={`text-sm ${category.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                        {category.tipo}
+                      <p className={`font-bold ${transaction.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
+                        {transaction.tipo === 'Ingreso' ? '+' : '-'}${transaction.monto.toFixed(2)}
                       </p>
                       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                         <DialogTrigger asChild>
@@ -436,7 +380,7 @@ export function FinanceDashboardComponent() {
                             variant="ghost"
                             size="icon"
                             onClick={() => {
-                              setEditingCategory(category)
+                              setEditingTransaction(transaction)
                               setIsEditDialogOpen(true)
                             }}
                           >
@@ -445,23 +389,43 @@ export function FinanceDashboardComponent() {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Editar Categoría</DialogTitle>
+                            <DialogTitle>Editar Transacción</DialogTitle>
                           </DialogHeader>
-                          <form onSubmit={handleEditCategory} className="space-y-4">
+                          <form onSubmit={handleEditTransaction} className="space-y-4">
                             <div className="space-y-2">
-                              <Label htmlFor="editCategoryName">Nombre</Label>
+                              <Label htmlFor="editDescription">Descripción</Label>
                               <Input
-                                id="editCategoryName"
-                                value={editingCategory?.nombre || ''}
-                                onChange={(e) => setEditingCategory({ ...editingCategory!, nombre: e.target.value })}
+                                id="editDescription"
+                                value={editingTransaction?.descripcion || ''}
+                                onChange={(e) => setEditingTransaction({ ...editingTransaction!, descripcion: e.target.value })}
                                 required
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="editCategoryType">Tipo</Label>
+                              <Label htmlFor="editAmount">Monto</Label>
+                              <Input
+                                id="editAmount"
+                                type="number"
+                                value={editingTransaction?.monto || ''}
+                                onChange={(e) => setEditingTransaction({ ...editingTransaction!, monto: parseFloat(e.target.value) })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="editDate">Fecha</Label>
+                              <Input
+                                id="editDate"
+                                type="date"
+                                value={editingTransaction?.fecha || ''}
+                                onChange={(e) => setEditingTransaction({ ...editingTransaction!, fecha: e.target.value })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="editType">Tipo</Label>
                               <Select
-                                onValueChange={(value: 'Ingreso' | 'Gasto') => setEditingCategory({ ...editingCategory!, tipo: value })}
-                                defaultValue={editingCategory?.tipo}
+                                onValueChange={(value: 'Ingreso' | 'Gasto') => setEditingTransaction({ ...editingTransaction!, tipo: value })}
+                                defaultValue={editingTransaction?.tipo}
                               >
                                 <SelectTrigger>
                                   <SelectValue placeholder="Selecciona el tipo" />
@@ -469,6 +433,22 @@ export function FinanceDashboardComponent() {
                                 <SelectContent>
                                   <SelectItem value="Ingreso">Ingreso</SelectItem>
                                   <SelectItem value="Gasto">Gasto</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="editCategory">Categoría</Label>
+                              <Select
+                                onValueChange={(value) => setEditingTransaction({ ...editingTransaction!, categoria: value })}
+                                defaultValue={editingTransaction?.categoria}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecciona la categoría" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {categories.map((category) => (
+                                    <SelectItem key={category.id} value={category.nombre}>{category.nombre}</SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </div>
@@ -484,7 +464,7 @@ export function FinanceDashboardComponent() {
                             variant="ghost"
                             size="icon"
                             onClick={() => {
-                              setDeletingCategoryId(category.id)
+                              setDeletingTransactionId(transaction.id)
                               setIsDeleteDialogOpen(true)
                             }}
                           >
@@ -495,12 +475,12 @@ export function FinanceDashboardComponent() {
                           <DialogHeader>
                             <DialogTitle>Confirmar Eliminación</DialogTitle>
                             <DialogDescription>
-                              ¿Estás seguro de que quieres eliminar la categoría "{category.nombre}"? Esta acción no se puede deshacer.
+                              ¿Estás seguro de que quieres eliminar esta transacción? Esta acción no se puede deshacer.
                             </DialogDescription>
                           </DialogHeader>
                           <DialogFooter>
                             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancelar</Button>
-                            <Button variant="destructive" onClick={handleDeleteCategory}>Eliminar</Button>
+                            <Button variant="destructive" onClick={handleDeleteTransaction}>Eliminar</Button>
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>
@@ -510,6 +490,14 @@ export function FinanceDashboardComponent() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4">
+          <CategoryTab
+            userId={userId!}
+            categories={categories}
+            setCategories={setCategories}
+          />
         </TabsContent>
       </Tabs>
     </div>
