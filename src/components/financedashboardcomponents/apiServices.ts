@@ -1,100 +1,78 @@
-// apiService.ts
-export const fetchCategories = async (userId: string) => {
-    try {
-      const response = await fetch(`/api/categories?userId=${userId}`);
-      if (!response.ok) throw new Error('Error al obtener categorías');
-      return await response.json();
-    } catch (error) {
-      throw new Error('Error al obtener categorías');
-    }
-  };
-  
-  export const fetchTransactions = async (userId: string) => {
-    try {
-      const response = await fetch(`/api/transactions?userId=${userId}`);
-      if (!response.ok) throw new Error('Error al obtener transacciones');
-      return await response.json();
-    } catch (error) {
-      throw new Error('Error al obtener transacciones');
-    }
-  };
-  
-  export const addTransaction = async (transaction: any, userId: string, categories: any[]) => {
-    try {
-      const response = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...transaction,
-          usuario_id: userId,
-          categoria_id: categories.find(c => c.nombre === transaction.categoria)?.id
-        }),
-      });
-  
-      if (!response.ok) throw new Error('Error al agregar transacción');
-      return await response.json();
-    } catch (error) {
-      throw new Error('Error al agregar transacción');
-    }
-  };
-  
-  export const addCategory = async (category: any, userId: string) => {
-    try {
-      const response = await fetch('/api/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: category.nombre,
-          tipo: category.tipo,
-          usuario_id: userId,
-        }),
-      });
-  
-      if (!response.ok) throw new Error('Error al agregar categoría');
-      return await response.json();
-    } catch (error) {
-      throw new Error('Error al agregar categoría');
-    }
-  };
-  
+const BASE_URL = 'https://fa-app-worker.cobijona.workers.dev';
 
-  export const updateCategory = async (category: { id: string; nombre: string; tipo: string }) => {
-    try {
-      const response = await fetch(`/api/categories/${category.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: category.nombre,
-          tipo: category.tipo,
-        }),
-      });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al actualizar categoría');
-      }
-  
-      return await response.json();
-    } catch (error) {
-      console.error('Error al actualizar categoría:', error);
-      throw new Error('Error al actualizar categoría');
-    }
+// Función para obtener el token del localStorage
+const getAuthToken = () => localStorage.getItem('authToken');
+
+// Función para realizar peticiones autenticadas
+const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('No se encontró el token de autenticación');
+  }
+
+  const headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
   };
-  
-  export const deleteCategory = async (categoryId: string) => {
-    try {
-      const response = await fetch(`/api/categories/${categoryId}`, {
-        method: 'DELETE',
-      });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al eliminar categoría');
-      }
-  
-      return await response.json();
-    } catch (error) {
-      console.error('Error al eliminar categoría:', error);
-      throw new Error('Error al eliminar categoría');
-    }
-  };
+
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401) {
+    // Token expirado o inválido, redirigir al login
+    localStorage.removeItem('authToken');
+    window.location.href = '/auth/login';
+    throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+  }
+  return response;
+};
+
+export const fetchCategories = async () => {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/categorias`);
+    if (!response.ok) throw new Error('Error al obtener categorías');
+    return await response.json();
+  } catch (error) {
+    throw new Error('Error al obtener categorías');
+  }
+};
+
+export const addCategory = async (category: { nombre: string; tipo: string }) => {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/categorias`, {
+      method: 'POST',
+      body: JSON.stringify(category),
+    });
+
+    if (!response.ok) throw new Error('Error al agregar categoría');
+    return await response.json();
+  } catch (error) {
+    throw new Error('Error al agregar categoría');
+  }
+};
+
+export const updateCategory = async (id: string, updates: { nombre?: string; tipo?: string }) => {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/categorias`, {
+      method: 'PUT',
+      body: JSON.stringify({ id, ...updates }),
+    });
+
+    if (!response.ok) throw new Error('Error al actualizar categoría');
+    return await response.json();
+  } catch (error) {
+    throw new Error('Error al actualizar categoría');
+  }
+};
+
+export const deleteCategory = async (id: string) => {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/categorias`, {
+      method: 'DELETE',
+      body: JSON.stringify({ id }),
+    });
+
+    if (!response.ok) throw new Error('Error al eliminar categoría');
+  } catch (error) {
+    throw new Error('Error al eliminar categoría');
+  }
+};

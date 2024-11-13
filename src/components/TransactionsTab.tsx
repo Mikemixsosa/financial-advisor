@@ -43,14 +43,33 @@ export function TransactionsTab({ userId, categories, transactions, setTransacti
     e.preventDefault()
 
     try {
-      const addedTransaction = await addTransaction(newTransaction, userId, categories)
-      setTransactions([...transactions, addedTransaction])
-      setNewTransaction({ descripcion: '', monto: '', fecha: format(new Date(), 'yyyy-MM-dd'), tipo: 'Gasto', categoria: '' })
-      setFilteredCategories(categories.filter(category => category.tipo === 'Gasto'))
+      // Encontrar la categoría seleccionada y obtener su `id`
+      const selectedCategory = categories.find((cat) => cat.nombre === newTransaction.categoria);
+      if (!selectedCategory) {
+        console.error('Categoría no encontrada');
+        return;
+      }
+
+      // Crear el objeto de transacción con el `categoria_id` en lugar del nombre de la categoría
+      const transactionData = {
+        descripcion: newTransaction.descripcion,
+        monto: parseFloat(newTransaction.monto), // Asegurarse de que `monto` sea numérico
+        fecha: newTransaction.fecha,
+        tipo: newTransaction.tipo,
+        categoria_id: selectedCategory.id, // Usar el id de la categoría
+      };
+
+      const addedTransaction = await addTransaction(transactionData); // Llamada a la API
+      setTransactions([...transactions, addedTransaction]); // Actualizar lista de transacciones
+
+      // Resetear el formulario después de agregar
+      setNewTransaction({ descripcion: '', monto: '', fecha: format(new Date(), 'yyyy-MM-dd'), tipo: 'Gasto', categoria: '' });
+      setFilteredCategories(categories.filter(category => category.tipo === 'Gasto'));
     } catch (error: any) {
-      console.error('Error al agregar transacción:', error)
+      console.error('Error al agregar transacción:', error);
     }
-  }
+  };
+
 
   const handleEditTransaction = async (e: React.FormEvent) => {
     e.preventDefault()

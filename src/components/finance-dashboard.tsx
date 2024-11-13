@@ -12,10 +12,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, ChevronDown, ChevronUp, DollarSign, Filter, PiggyBank, X, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { fetchCategories, fetchTransactions } from './financedashboardcomponents/apiServices'
+import { fetchCategories } from './financedashboardcomponents/apiServices'
 import { Transaction, Category, DateRange } from './financedashboardcomponents/financedashboardtypes'
 import { CategoryTab } from './CategoryTab'
 import { TransactionsTab } from './TransactionsTab'
+import { fetchTransactions } from './financedashboardcomponents/transactionsApiServices'
 
 export function FinanceDashboardComponent() {
   const [userId, setUserId] = useState<string | null>(null)

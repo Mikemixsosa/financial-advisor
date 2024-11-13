@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export function LoginInterfaceComponent() {
   const [email, setEmail] = useState('')
-  const [firebaseUid, setFirebaseUid] = useState('')
+  const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -23,22 +23,23 @@ export function LoginInterfaceComponent() {
     setError('')
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('https://fa-app-worker.cobijona.workers.dev/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firebase_uid: firebaseUid }),
+        body: JSON.stringify({ email, password }),
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        console.log('Inicio de sesión exitoso:', data)
-        // Store user ID in localStorage
-        localStorage.setItem('userId', data.user.id.toString())
-        router.push('/finanzas')
+        console.log('Inicio de sesión exitoso:', data);
+        // Guarda el token de autenticación en localStorage
+        localStorage.setItem('authToken', data.token);
+        router.push('/finanzas');
       } else {
-        setError(data.error || 'Error en el inicio de sesión')
+        setError(data.error || 'Error en el inicio de sesión');
       }
+
     } catch (error) {
       setError('Error en la conexión')
     } finally {
@@ -48,12 +49,14 @@ export function LoginInterfaceComponent() {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Registro con:', email, firebaseUid)
+    console.log('Registro con:', email, password)
+    // Aquí puedes implementar la lógica de registro si es necesario
   }
 
   const handleForgotPassword = (e: React.FormEvent) => {
     e.preventDefault()
     console.log('Recuperar contraseña para:', email)
+    // Aquí puedes implementar la lógica de recuperación de contraseña si es necesario
   }
 
   return (
@@ -83,12 +86,12 @@ export function LoginInterfaceComponent() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="firebase_uid">Firebase UID</Label>
+                  <Label htmlFor="password">Contraseña</Label>
                   <Input
-                    id="firebase_uid"
+                    id="password"
                     type="password"
-                    value={firebaseUid}
-                    onChange={(e) => setFirebaseUid(e.target.value)}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                   />
                 </div>
@@ -109,9 +112,9 @@ export function LoginInterfaceComponent() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="register-firebase_uid">Firebase UID</Label>
+                  <Label htmlFor="register-password">Contraseña</Label>
                   <Input
-                    id="register-firebase_uid"
+                    id="register-password"
                     type="password"
                     required
                   />
