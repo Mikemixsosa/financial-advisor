@@ -30,8 +30,15 @@ export function FinanceDashboardComponent() {
   const [showFilters, setShowFilters] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-
+  const [filteredCategories, setFilteredCategories] = useState<Category[]>([])
   const router = useRouter()
+
+  useEffect(() => {
+    const filteredByType = filters.tipo === 'Todos'
+      ? categories
+      : categories.filter(category => category.tipo === filters.tipo)
+    setFilteredCategories(filteredByType)
+  }, [filters.tipo, categories])
 
   useEffect(() => {
     const storedUserId = localStorage.getItem('userId')
@@ -189,7 +196,7 @@ export function FinanceDashboardComponent() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Todas">Todas</SelectItem>
-                    {categories.map((category) => (
+                    {filteredCategories.map((category) => (
                       <SelectItem key={category.id} value={category.nombre}>{category.nombre}</SelectItem>
                     ))}
                   </SelectContent>
