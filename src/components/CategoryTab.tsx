@@ -38,10 +38,10 @@ export function CategoryTab({ userId, categories, setCategories }: CategoryTabPr
       setFilteredCategories(categories.filter(category => category.tipo === type))
     }
   }
+
   useEffect(() => {
     filterCategories(selectedType)
   }, [selectedType, categories])
-
 
 
   const handleAddCategory = async (e: React.FormEvent) => {
@@ -49,7 +49,7 @@ export function CategoryTab({ userId, categories, setCategories }: CategoryTabPr
     if (!userId) return
 
     try {
-      const addedCategory = await addCategory(newCategory, userId)
+      const addedCategory = await addCategory(newCategory)
       setCategories(prevCategories => [...prevCategories, addedCategory])
       setNewCategory({ nombre: '', tipo: 'Gasto' })
       filterCategories(selectedType)
