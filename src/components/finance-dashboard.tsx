@@ -31,7 +31,6 @@ export function FinanceDashboardComponent() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [filteredCategories, setFilteredCategories] = useState<Category[]>([])
-  const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -42,73 +41,29 @@ export function FinanceDashboardComponent() {
   }, [filters.tipo, categories])
 
   useEffect(() => {
-    const checkAuthAndInitialize = async () => {
-      console.log('Checking authentication status...')
-      const storedUserId = localStorage.getItem('userId')
-      const storedAuthToken = localStorage.getItem('authToken')
-
-      if (!storedUserId || !storedAuthToken) {
-        console.warn('User ID or Auth Token not found in localStorage')
-        console.log('Redirecting to login page...')
-        router.push('/auth/login')
-        return
-      }
-
-      console.log(`User ID found: ${storedUserId}`)
+    const storedUserId = localStorage.getItem('userId')
+    if (!storedUserId) {
+      router.push('/auth/login')
+    } else {
       setUserId(storedUserId)
-
-      try {
-        console.log('Validating auth token...')
-        const isValid = await validateAuthToken(storedAuthToken)
-        if (!isValid) {
-          console.error('Auth token is invalid or expired')
-          console.log('Clearing invalid credentials and redirecting to login...')
-          localStorage.removeItem('userId')
-          localStorage.removeItem('authToken')
-          router.push('/auth/login')
-          return
-        }
-
-        console.log('Auth token is valid. Initializing data...')
-        await initializeData(storedUserId)
-      } catch (error) {
-        console.error('Error during authentication check:', error)
-        setError('An error occurred while checking authentication. Please try again.')
-      } finally {
-        setAuthCheckComplete(true)
-      }
+      initializeData(storedUserId)
     }
-
-    checkAuthAndInitialize()
   }, [router])
-
-  const validateAuthToken = async (token: string): Promise<boolean> => {
-    // Implement your token validation logic here
-    // This could be a call to your backend to verify the token
-    // For now, we'll just return true as a placeholder
-    return true
-  }
 
   const initializeData = async (userId: string) => {
     try {
       setIsLoading(true)
-      console.log('Fetching categories...')
+
       const categoriesData = await fetchCategories(userId)
       setCategories(categoriesData)
-      console.log('Categories fetched successfully')
-
-      console.log('Fetching transactions...')
       const transactionsData = await fetchTransactions(userId)
       setTransactions(transactionsData)
-      console.log('Transactions fetched successfully')
     } catch (error) {
-      console.error('Error loading initial data:', error)
-      setError('Failed to load dashboard data. Please refresh the page or try again later.')
+      console.error('Error al cargar los datos iniciales', error)
     } finally {
       setIsLoading(false)
     }
   }
-
 
   const clearFilters = () => {
     setFilters({

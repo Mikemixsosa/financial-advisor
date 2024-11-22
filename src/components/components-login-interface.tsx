@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,14 +16,23 @@ export function LoginInterfaceComponent() {
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [isClient, setIsClient] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    setIsClient(true)
+    console.log('Component mounted on client-side')
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
 
+    console.log('Login attempt initiated for email:', email)
+
     try {
+      console.log('Sending login request to API')
       const response = await fetch('https://fa-app-worker.cobijona.workers.dev/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -33,14 +42,23 @@ export function LoginInterfaceComponent() {
       const data = await response.json()
 
       if (response.ok) {
-        console.log('Inicio de sesión exitoso:', data);
-        localStorage.setItem('authToken', data.token);
-        router.push('/finanzas');
+        console.log('Login successful, received token')
+        if (isClient) {
+          console.log('Storing auth token and userId in localStorage')
+          localStorage.setItem('authToken', data.token)
+          localStorage.setItem('userId', '1') // Adding userId = 1 to localStorage
+          console.log('Redirecting to /finanzas')
+          router.push('/finanzas')
+        } else {
+          console.error('Unable to access localStorage, not on client-side')
+        }
       } else {
-        setError(data.error || 'Error en el inicio de sesión');
+        console.error('Login failed:', data.error)
+        setError(data.error || 'Error en el inicio de sesión')
       }
 
     } catch (error) {
+      console.error('Network error during login:', error)
       setError('Error en la conexión')
     } finally {
       setIsLoading(false)
@@ -49,14 +67,18 @@ export function LoginInterfaceComponent() {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Registro con:', email, password)
+    console.log('Register attempt for email:', email)
     // Implementar lógica de registro aquí
   }
 
   const handleForgotPassword = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Recuperar contraseña para:', email)
+    console.log('Password recovery requested for email:', email)
     // Implementar lógica de recuperación de contraseña aquí
+  }
+
+  if (!isClient) {
+    return <div>Loading...</div>
   }
 
   return (
