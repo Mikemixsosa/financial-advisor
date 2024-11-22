@@ -31,10 +31,6 @@ export function CategoryTab({ userId, categories, setCategories }: CategoryTabPr
   const [selectedType, setSelectedType] = useState<'Todos' | 'Ingreso' | 'Gasto'>('Todos')
   const [filteredCategories, setFilteredCategories] = useState<Category[]>(categories)
 
-  useEffect(() => {
-    filterCategories(selectedType)
-  }, [selectedType, categories])
-
   const filterCategories = (type: 'Todos' | 'Ingreso' | 'Gasto') => {
     if (type === 'Todos') {
       setFilteredCategories(categories)
@@ -42,6 +38,11 @@ export function CategoryTab({ userId, categories, setCategories }: CategoryTabPr
       setFilteredCategories(categories.filter(category => category.tipo === type))
     }
   }
+  useEffect(() => {
+    filterCategories(selectedType)
+  }, [selectedType, categories])
+
+
 
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault()
