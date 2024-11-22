@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -31,17 +31,18 @@ export function CategoryTab({ userId, categories, setCategories }: CategoryTabPr
   const [selectedType, setSelectedType] = useState<'Todos' | 'Ingreso' | 'Gasto'>('Todos')
   const [filteredCategories, setFilteredCategories] = useState<Category[]>(categories)
 
-  const filterCategories = (type: 'Todos' | 'Ingreso' | 'Gasto') => {
+  const filterCategories = useCallback((type: 'Todos' | 'Ingreso' | 'Gasto') => {
     if (type === 'Todos') {
       setFilteredCategories(categories)
     } else {
       setFilteredCategories(categories.filter(category => category.tipo === type))
     }
-  }
+  }, [categories])
 
   useEffect(() => {
     filterCategories(selectedType)
-  }, [selectedType, categories])
+  }, [selectedType, categories, filterCategories])
+  
 
 
   const handleAddCategory = async (e: React.FormEvent) => {
